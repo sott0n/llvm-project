@@ -151,4 +151,9 @@ def SCFForToWhileLoop : Pass<"scf-for-to-while"> {
   }];
 }
 
+def SCFLoopInvariantCodeMotion : Pass<"scf-loop-invariant-code-motion"> {
+  let summary = "Hoist loop invariant instructions outside of SCF loops";
+  let constructor = "mlir::createSCFLoopInvariantCodeMotionPass()";
+}
+
 #endif // MLIR_DIALECT_SCF_PASSES

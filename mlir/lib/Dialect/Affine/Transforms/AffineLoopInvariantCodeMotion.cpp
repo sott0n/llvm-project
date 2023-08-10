@@ -78,7 +78,7 @@ areAllOpsInTheBlockListInvariant(Region &blockList, Value indVar,
 static bool isOpLoopInvariant(Operation &op, Value indVar, ValueRange iterArgs,
                               SmallPtrSetImpl<Operation *> &opsWithUsers,
                               SmallPtrSetImpl<Operation *> &opsToHoist) {
-  LLVM_DEBUG(llvm::dbgs() << "iterating on op: " << op;);
+  LLVM_DEBUG(llvm::dbgs() << "Iterating on op: " << op.getName() << "\n");
 
   if (auto ifOp = dyn_cast<AffineIfOp>(op)) {
     if (!checkInvarianceOfNestedIfOps(ifOp, indVar, iterArgs, opsWithUsers,
