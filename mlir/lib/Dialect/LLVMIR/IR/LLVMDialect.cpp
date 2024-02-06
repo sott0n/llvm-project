@@ -25,6 +25,8 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/AsmParser/Parser.h"
@@ -1689,28 +1691,84 @@ LogicalResult InsertValueOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult ReturnOp::verify() {
-  auto parent = (*this)->getParentOfType<LLVMFuncOp>();
-  if (!parent)
+  auto funcFunc = (*this)->getParentOfType<func::FuncOp>();
+  if (funcFunc) {
+    const auto &results = funcFunc.getFunctionType().getResults();
+    if (!results.size()) {
+      if (!getArg())
+        return success();
+      InFlightDiagnostic diag = emitOpError("expected no operands");
+      diag.attachNote(funcFunc->getLoc()) << "when returning from func.funcOp";
+      return diag;
+    }
+    if (!getArg()) {
+      if (!results.size())
+        return success();
+      InFlightDiagnostic diag = emitOpError("expected 1 operand");
+      diag.attachNote(funcFunc->getLoc()) << "when returning from func.funcOp";
+      return diag;
+    }
+
+    if (results.size() == 1) {
+      if (isa<MemRefType>(results[0]))
+        if (isa<LLVMStructType, LLVMPointerType>(getArg().getType()))
+          return success();
+      if (results[0] == getArg().getType())
+        return success();
+      InFlightDiagnostic diag = emitOpError("mismatching result types");
+      diag.attachNote(funcFunc->getLoc()) << "when returning from func.funcOp";
+      return diag;
+    }
+
+    // Check a packed multiple values into a structure type.
+    auto structType = llvm::dyn_cast<LLVMStructType>(getArg().getType());
+    if (!structType) {
+      InFlightDiagnostic diag = emitOpError("expected struct type operand");
+      diag.attachNote(funcFunc->getLoc()) << "when returning from func.funcOp";
+      return diag;
+    }
+    if (results.size() != structType.getBody().size()) {
+      InFlightDiagnostic diag = emitOpError() << "has a struct includes "
+                                              << structType.getBody().size()
+                                              << "elements, but enclosing function"
+                                              << "returns " << results.size();
+      diag.attachNote(funcFunc->getLoc()) << "when returning from func.funcOp";
+      return diag;
+    }
+    for (unsigned i = 0, e = results.size(); i != e; ++i) {
+      if (isa<LLVMStructType, LLVMPointerType>(results[i]))
+        continue;
+      if (structType.getBody()[i] != results[i]) {
+        InFlightDiagnostic diag = emitOpError() << "mismatching result type at operand " << i;
+        diag.attachNote(funcFunc->getLoc()) << "when returning from func.funcOp";
+        return diag;
+      }
+    }
+    return success();
+  }
+
+  auto llvmFunc = (*this)->getParentOfType<LLVMFuncOp>();
+  if (!llvmFunc)
     return success();
 
-  Type expectedType = parent.getFunctionType().getReturnType();
+  Type expectedType = llvmFunc.getFunctionType().getReturnType();
   if (llvm::isa<LLVMVoidType>(expectedType)) {
     if (!getArg())
       return success();
     InFlightDiagnostic diag = emitOpError("expected no operands");
-    diag.attachNote(parent->getLoc()) << "when returning from function";
+    diag.attachNote(llvmFunc->getLoc()) << "when returning from llvm.funcOp";
     return diag;
   }
   if (!getArg()) {
     if (llvm::isa<LLVMVoidType>(expectedType))
       return success();
     InFlightDiagnostic diag = emitOpError("expected 1 operand");
-    diag.attachNote(parent->getLoc()) << "when returning from function";
+    diag.attachNote(llvmFunc->getLoc()) << "when returning from llvm.funcOp";
     return diag;
   }
   if (expectedType != getArg().getType()) {
     InFlightDiagnostic diag = emitOpError("mismatching result types");
-    diag.attachNote(parent->getLoc()) << "when returning from function";
+    diag.attachNote(llvmFunc->getLoc()) << "when returning from llvm.funcOp";
     return diag;
   }
   return success();

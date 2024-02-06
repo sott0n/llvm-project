@@ -38,6 +38,7 @@ add_mlir_dialect_library(MLIRLLVMDialect
   MLIRMemorySlotInterfaces
   MLIRSideEffectInterfaces
   MLIRSupport
+  MLIRFuncDialect
   )
 
 add_mlir_dialect_library(MLIRNVVMDialect
