@@ -209,6 +209,10 @@ def LowerSparseOpsToForeach : Pass<"lower-sparse-ops-to-foreach", "ModuleOp"> {
   let summary = "Applies sparse tensor rewriting rules after sparsification";
   let description = [{
     A pass that lowers high-level sparse operations to sparse_tensor.foreach.
+    This includes number_of_entries for tensors with loose-compressed levels,
+    whose storage may contain holes. Run this pass and
+    lower-sparse-foreach-to-scf before converting such queries with
+    sparse-tensor-codegen or sparse-tensor-conversion.
   }];
   let constructor = "mlir::createLowerSparseOpsToForeachPass()";
   let dependentDialects = [
